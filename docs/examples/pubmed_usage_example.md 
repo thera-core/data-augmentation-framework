@@ -1,0 +1,124 @@
+## PubMed Usage Example
+
+This tutorial demonstrates how to use the **PubMedAugmenter** in the **data-augmentation-framework** to retrieve PubMed IDs (PMIDs) and abstracts for gene symbols or other keywords in your dataset. We’ll walk through:
+
+1. **Setting up** the required libraries.  
+2. **Loading** your dataset (e.g., a Pandas DataFrame).  
+3. **Augmenting** the dataset with PubMed references.  
+4. **Reviewing** the context logs to see how the data was enriched.
+
+---
+
+### 1. Prerequisites
+
+- A **Python** environment with **pandas** (for demonstration).  
+- The **data-augmentation-framework** installed (in the same project or installed as a package).  
+- **Network access** to call PubMed’s E-utilities (if making real API requests).
+
+```bash
+pip install pandas requests
+# ... or if you have a requirements.txt, ensure data-augmentation-framework is included
+```
+
+---
+
+### 2. Simple Example Code
+
+Below is a minimal Python script that shows how to import and invoke the **PubMedAugmenter**.
+
+```python
+# pubmed_example.py
+
+import pandas as pd
+from data_augmentation_framework.augmenters_api import PubMedAugmenter
+
+# 1. Prepare your dataset (in this example, a Pandas DataFrame)
+data = pd.DataFrame({
+    "gene_symbol": ["BRCA1", "TP53", "EGFR", "BRCA1"],  # repeated to see duplicates
+    "expression_value": [1.2, 0.8, 3.5, 2.0]
+})
+
+print("Original DataFrame:")
+print(data)
+
+# 2. Create an instance of PubMedAugmenter
+augmenter = PubMedAugmenter(
+    query_column="gene_symbol",   # the column in 'data' to query
+    enable_cache=True,            # optional: cache repeated queries
+    max_retries=3                 # how many times to retry on transient errors
+)
+
+# 3. Augment the data
+augmented_data = augmenter.augment_data(data)
+
+print("\nAugmented DataFrame:")
+print(augmented_data)
+
+# 4. (Optional) Access context logs
+# If your data is context-aware, it has an adapter reference:
+adapter = getattr(augmented_data, "_context_adapter", None)
+if adapter:
+    # Example of retrieving context for 'BRCA1'
+    brca1_context = adapter.get_context("BRCA1")
+    print("\nContext for 'BRCA1':")
+    print(brca1_context)
+```
+
+#### Explanation
+- **Step 1**: We create a simple DataFrame with a `gene_symbol` column.  
+- **Step 2**: We instantiate `PubMedAugmenter`, specifying which column to query.  
+- **Step 3**: We call `augment_data()`, which:
+  1. Ensures the DataFrame is context-aware (wrapping with an adapter if needed).  
+  2. Searches PubMed for each unique symbol, retrieves PMIDs/abstracts (in a real scenario, it would query the actual PubMed API).  
+  3. Inserts those references into new columns (e.g., `pmids`, `abstract_snippets`).  
+  4. Logs the operation in the context store.  
+- **Step 4**: We optionally access the context logs for a specific item (in this case, `"BRCA1"`).
+
+---
+
+### 3. Possible Output
+
+After running `pubmed_example.py`, you might see something like:
+
+```
+Original DataFrame:
+  gene_symbol  expression_value
+0       BRCA1               1.2
+1        TP53               0.8
+2        EGFR               3.5
+3       BRCA1               2.0
+
+Augmented DataFrame:
+  gene_symbol  expression_value        pmids                         abstract_snippets
+0       BRCA1               1.2  [12345, 67890]  [Abstract text for 12345, Abstract t...
+1        TP53               0.8  [13579, 24680]  [Abstract text for 13579, Abstract t...
+2        EGFR               3.5  [11223, 44556]  [Abstract text for 11223, Abstract t...
+3       BRCA1               2.0  [12345, 67890]  [Abstract text for 12345, Abstract t...
+
+Context for 'BRCA1':
+[
+  {
+    "source": "PubMedAugmenter",
+    "details": {
+      "pmids": [12345, 67890],
+      "abstract_snippets": ["Abstract text for 12345", "Abstract text for 67890"]
+    },
+    "timestamp": "2025-01-01T00:00:00Z",
+    ...
+  }
+]
+```
+
+#### Notes
+- The context output is an example structure; actual log format may differ.  
+- Real PubMed calls would involve actual PMIDs and abstracts.  
+
+---
+
+### 4. Next Steps
+
+- **Caching**: Explore caching to handle large datasets with repeated symbols.  
+- **Concurrency**: For huge data, consider chunking the DataFrame and distributing calls.  
+- **Integration**: Use this example as part of a broader pipeline (e.g., multi-agent orchestration in TheraLab).
+
+That’s it! You’ve successfully integrated **PubMed** references into your dataset and recorded the provenance in the context store.
